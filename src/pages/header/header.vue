@@ -7,17 +7,17 @@
 					<img :src="seller.avatar" width='64' height='64'>
 				</div>
 				<div class="description">
-					<h2 class="title"><i class='icon'></i>{{seller.name}}</h2>
+					<h2 class="title"><icon name='brand' :size='{width: 30,height: 18}'></icon>{{seller.name}}</h2>
 					<div class="delivery">{{seller.description}}/{{seller.deliveryTime}}分钟送达</div>
-					<div class="activity" v-if='seller.supports'><i class='icon'></i><p>{{seller.supports[0].description}}</p></div>
+					<div class="activity" v-if='seller.supports'><icon name='decrease' :size='{width: 12,height: 12}'></icon><p>{{seller.supports[0].description}}</p></div>
 				</div>
-				<div class="sellerNumber" v-if='seller.supports'  @click='show'>
+				<div class="sellerNumber" v-if='seller.supports'  @click='show()'>
 					<span>{{seller.supports.length}}个</span>
 					<span class="icon-keyboard_arrow_right"></span>
 				</div>
 			</div>
-			<div class="bulletin" @click='show'>
-				<i class='icon'></i>
+			<div class="bulletin" @click='show()'>
+				<icon name='bulletin' :size='{width:22,height:12}'></icon>
 				<p>{{seller.bulletin}}</p>
 				<span class="icon-keyboard_arrow_right"></span>
 			</div>
@@ -26,69 +26,97 @@
 		<!--头部背景图片开始-->
 		<div class="background" :style='bgImg' v-if='seller.avatar'></div>
 		<!--头部背景图片结束-->
-		<!--遮罩层开始-->
-		<div class="mask"v-show='visible'>
-			<div class="mask-title" v-if="seller.score">
-				<h2>{{seller.name}}</h2>
-				<!--评价的星星开始-->
-				<star :score='3.6'/>
-				<!--评价的星星结束-->
+		<transition name='slide'>
+			<!--遮罩层开始-->
+			<div class="mask" v-show='visible'>
+				<div class="mask-title" v-if="seller.score">
+					<h2>{{seller.name}}</h2>
+					<!--评价的星星开始-->
+					<star :score='seller.score'/>
+					<!--评价的星星结束-->
+				</div>
+				<div class="preferential">
+					<maskMsg :title='"优惠信息"'/>
+					<ul class='list' v-if='seller.supports'>
+						<li v-for='item,index of seller.supports' :key='index'>
+							<icon :name='classMap[index]' :size='{width:16,height:16}'></icon>
+							<span>{{item.description}}</span>
+						</li>
+					</ul>
+				</div>
+				<div class="announcement">
+					<maskMsg :title='"商家公告"'/>
+					<p>{{seller.bulletin}}</p>
+				</div>
+				<div class="icon-close" @click='show()'></div>
 			</div>
-			<maskMsg :title='"优惠信息"'/>
-			<ul class='list' v-if='seller.supports'>
-				<li v-for='item,index of seller.supports' :key='index'><i class="icon"></i><span>{{item.description}}</span></li>
-			</ul>
-			<maskMsg :title='"商家公告"'/>
-			<p>{{seller.bulletin}}</p>
-			<div class="icon-close" @click='show'></div>
-		</div>
-		<!--遮罩层结束-->
+			<!--遮罩层结束-->
+		</transition>		
 	</header>
 </template>
 <script>
-	import axios from 'axios';
-	
-	export default{
-		name: 'cmp-header',
-		data(){
+	export default {
+		name: 'seller-header',
+		data() {
 			return {
 				seller: {},
 				visible: false
 			}
 		},
-		computed:{
-			bgImg(){
-				return {
-					background:`url(${this.seller.avatar})`
-				}
-			}
-		},
 		methods: {
-			show(){
-				this.visible = !this.visible
+			show() {
+				this.visible = !this.visible;
 			}
 		},
-		created(){
-			axios({
-				url: 'http://localhost:9090/api/key',
-				method: 'post'
-			}).then(res => {
-				if(!res.data.code){
-					axios({
-						url: 'http://localhost:9090/api/seller',
-						params: {
-							token: res.data.key,
-						}
-					}).then(res => {
-						if(!res.data.code){
-							console.log(res.data.data);
-							this.seller = res.data.data;
-						}
-					})
+		computed: {
+			// 背景图片样式 
+			bgImg() {
+				return {
+					background: `url(${this.seller.avatar})`
 				}
-			}).catch(err => {
+			}
+		},
+		// 组件创建后  发请求 
+		created() {
+			this.classMap = ['decrease','discount','discount','special','special'];
+			// 没有key,发第一次请求 
+			if(!localStorage.getItem('key')) {
+				this.$axios({
+					url: 'http://localhost:9999/api/key',
+					method: 'post'
+				}).then(res => {
+					if(!res.data.code) {
+						localStorage.setItem('key',res.data.key);
+						this.$axios({
+							url: 'http://localhost:9999/api/seller',
+							params: {
+								token: res.data.key
+							}
+						}).then(res => {
+							if(!res.data.code) {
+								this.seller = res.data.data
+							}
+						});
+					}
+				}).catch(err => {
+					
+				})
 				
-			})
+			// 如果key存在,直接从本地去取
+			}else {
+				let key = localStorage.getItem('key');
+				this.$axios({
+					url: 'http://localhost:9999/api/seller',
+					params: {
+						token: key
+					}
+				}).then(res => {
+					if(!res.data.code) {
+						this.seller = res.data.data;
+					}
+				})
+			}
+			
 		}
 	}
 </script>
@@ -98,10 +126,11 @@
 		.content
 			background: $bg-color-light
 			.infomation
+				box-sizing: border-box
+				width: 100%
 				position: relative
 				display: flex
 				padding: 24px 12px 18px 24px
-				box-sizing: border-box
 				.logo
 					width: 64px
 					height: 64px
@@ -120,12 +149,7 @@
 						font-weight: bold
 						line-height: 18px
 						.icon
-							display: inline-block
 							margin-right: 6px
-							width: 30px
-							height: 18px
-							background: url('brand@2x.png')
-							background-size: cover
 					.delivery
 						font-size: 12px
 						font-weight: 100
@@ -139,12 +163,6 @@
 							font-weight: 100
 							line-height: 12px
 							padding-left: 4px
-						.icon
-							display: inline-block
-							width: 12px
-							height: 12px											
-							background: url('decrease_1@2x.png')
-							background-size: cover
 				.sellerNumber
 					position: absolute
 					right: 12px
@@ -185,12 +203,6 @@
 					white-space: nowrap
 					text-overflow: ellipsis
 					padding-left: 4px
-				.icon
-					display: inline-block
-					width: 22px
-					height: 12px
-					background: url('bulletin@2x.png')
-					background-size: cover
 				.icon-keyboard_arrow_right
 					float: right
 					padding-left: 4px
@@ -212,6 +224,12 @@
 			background: $bg-color-dark
 			box-sizing: border-box
 			z-index: 4
+			&.slide-enter,&.slide-leave-to
+				transform: translateY(-100%)
+			&.slide-enter-active,&.slide-leave-active
+				transition: 500ms
+			&.slide-enter-to,&.slide-leave
+				transform: translateY(0)
 			.mask-title
 				padding-top: 64px
 				h2
@@ -220,6 +238,10 @@
 					color: $font-color-lighter
 					line-height: 16px
 					text-align: center
+			.star
+				padding-top: 16px
+				.star-item
+					margin: 0 6px
 			.list
 				padding: 0 24px;
 				box-sizing: border-box
@@ -232,30 +254,6 @@
 						color: $font-color-lighter
 						line-height: $font-size-smal
 						padding-left: 6px
-					i
-						display: inline-block
-						width: 16px
-						height: 16px
-					&:nth-of-type(1)
-						.icon
-							background: url('decrease_1@3x.png')
-							background-size: cover
-					&:nth-of-type(2)
-						.icon
-							background: url('discount_1@3x.png')
-							background-size: cover
-					&:nth-of-type(3)
-						.icon
-							background: url('discount_1@3x.png')
-							background-size: cover
-					&:nth-of-type(4)
-						.icon
-							background: url('guarantee_1@3x.png')
-							background-size: cover
-					&:nth-of-type(5)
-						.icon
-							background: url('guarantee_1@3x.png')
-							background-size: cover
 			p
 				position: relative
 				font-size: $font-size-small
@@ -266,8 +264,9 @@
 				box-sizing: border-box
 			.icon-close
 				position: absolute
-				left: 45%
+				left: 50%
 				bottom: 32px
+				margin-left: -16px
 				font-size: 32px
 				color: $font-color-darkest
 </style>
